@@ -9,8 +9,8 @@ import re
 df = pd.read_excel(r'germanBooks2.xlsx') 
 rowCount = df.shape[0]
 
-progress = progressbar.ProgressBar()
-for p in progress(range(rowCount)):
+progress = progressbar.ProgressBar(maxval=rowCount, redirect_stdout=True).start()
+for p in range(rowCount):
     url = df.iloc[p, 18]
     year = str(df.iloc[p, 4])
     author = str(df.iloc[p, 1])
@@ -18,17 +18,39 @@ for p in progress(range(rowCount)):
     filename = author + ' ('+year+') '+title
     filenameValid = re.sub("[/:*?<>|]", "-", filename)
     # Use your own username or custom location
-    saveLocation = '/Users/username/Downloads/Python/' + filenameValid + '.pdf'
+    saveLocation = '../books/' + filenameValid + '.'
+
+    try:
+        with open(saveLocation + 'pdf') as f:
+            pass
+        # with open(saveLocation + 'epub') as f:
+        #     pass
+        print('Already downloaded:', title)
+        progress.update(p + 1, force=True)
+        continue
+    except FileNotFoundError:
+        pass
 
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html5lib')
 
-    table = soup.find('a', attrs={'class': 'test-bookpdf-link'})
-    table = table.get("href")
-    link = "https://link.springer.com" + table
+    success = []
+    for fmt in ['pdf', 'epub']:
+        table = soup.find('a', attrs={'class': f'test-book{fmt}-link'})
+        if not table and fmt == 'epub':
+            # print('EPUB not available:', title)
+            continue
 
-    r2 = requests.get(link)
-    with open(saveLocation, 'wb') as f:
-        f.write(r2.content)
+        table = table.get("href")
+        link = "https://link.springer.com" + table
 
-    print('Successful download: ', title)
+        r2 = requests.get(link)
+        with open(saveLocation + fmt, 'wb') as f:
+            f.write(r2.content)
+
+        success.append(f'[{fmt.upper()}]')
+
+    print('Successful download:', title, *success)
+    progress.update(p + 1, force=True)
+
+progress.update(rowCount, force=True)
